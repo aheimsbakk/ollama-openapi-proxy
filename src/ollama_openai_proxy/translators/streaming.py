@@ -9,25 +9,14 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any, AsyncIterator
 
 import httpx
 
-from ollama_openai_proxy.translators.streaming_adapter import SSEAdapter, _ts_to_iso8601
-
-# Keep the old private name for backward compatibility with tests.
-_SSEAdapter = SSEAdapter
+from ollama_openai_proxy.translators.streaming_adapter import SSEAdapter
 
 logger = logging.getLogger("ollama_openai_proxy")
-
-
-def _emit_action(
-    adapter: SSEAdapter, model: str, json_mod: Any, done: bool
-) -> dict[str, Any]:
-    """Build and serialize an action output from the adapter."""
-    if done:
-        return adapter.build_chunk(done=True)
-    return adapter.build_chunk(done=False)
 
 
 async def sse_to_ollama_stream(
@@ -49,89 +38,60 @@ async def sse_to_ollama_stream(
     Yields:
         Ollama-format NDJSON lines, one per SSE event.
     """
-    first_line: str | None = None
-    if created is None:
-        async for line in _read_sse_lines(upstream_response):
-            if line.startswith("data: "):
-                data = line[6:]
-                if data.strip() != "[DONE]":
-                    try:
-                        parsed = json.loads(data)
-                        if isinstance(parsed, dict) and "created" in parsed:
-                            created = parsed["created"]
-                    except json.JSONDecodeError:
-                        pass
-                first_line = line
-                break
-
     adapter = SSEAdapter(model, created, is_chat)
     done_received = False
     content_emitted = False
 
     try:
-        if first_line is not None:
-            action = adapter.process_line(first_line)
-            if action == "emit":
-                content_emitted = True
-                yield (
-                    json.dumps(adapter.build_chunk(done=False), separators=(",", ":"))
-                    + "\n"
-                )
-            elif action == "done":
-                done_received = True
-                yield (
-                    json.dumps(adapter.build_chunk(done=True), separators=(",", ":"))
-                    + "\n"
-                )
-            elif action == "error":
-                done_received = True
-                yield (
-                    json.dumps(
-                        {
-                            "model": model,
-                            "error": adapter.last_error or "upstream error in stream",
-                            "done": True,
-                        },
-                        separators=(",", ":"),
-                    )
-                    + "\n"
-                )
-            elif action == "skip":
-                logger.warning("Skipping malformed SSE line: %s", first_line[:100])
-
         async for line in _read_sse_lines(upstream_response):
-            action = adapter.process_line(line)
+            if not line.startswith("data: "):
+                continue
 
-            if action == "emit":
-                content_emitted = True
-                yield (
-                    json.dumps(adapter.build_chunk(done=False), separators=(",", ":"))
-                    + "\n"
-                )
-
-            elif action == "done":
+            data = line[6:].strip()
+            if data == "[DONE]":
                 done_received = True
                 yield (
                     json.dumps(adapter.build_chunk(done=True), separators=(",", ":"))
                     + "\n"
                 )
+                break
 
-            elif action == "error":
+            # Extract created timestamp from the first data line if not provided.
+            if created is None:
+                try:
+                    parsed = json.loads(data)
+                    if isinstance(parsed, dict) and "created" in parsed:
+                        adapter.created_at = _ts_to_iso8601(parsed["created"])
+                        created = parsed["created"]
+                except json.JSONDecodeError:
+                    pass
+
+            try:
+                parsed = json.loads(data)
+            except json.JSONDecodeError:
+                logger.warning("Skipping malformed SSE line: %s", line[:100])
+                continue
+
+            if isinstance(parsed, dict) and "error" in parsed:
                 done_received = True
                 yield (
                     json.dumps(
                         {
                             "model": model,
-                            "error": adapter.last_error or "upstream error in stream",
+                            "error": parsed["error"],
                             "done": True,
                         },
                         separators=(",", ":"),
                     )
                     + "\n"
                 )
+                break
 
-            elif action == "skip":
-                logger.warning("Skipping malformed SSE line: %s", line[:100])
+            content_emitted = True
+            adapter._accumulate(parsed)
+
+            chunk = adapter.build_chunk(done=False)
+            yield json.dumps(chunk, separators=(",", ":")) + "\n"
 
     except httpx.ReadTimeout:
         done_received = True
@@ -183,6 +143,16 @@ async def sse_to_ollama_stream(
         await upstream_response.aclose()
 
 
+def _ts_to_iso8601(unix_ts: int | float | None) -> str:
+    """Convert a Unix timestamp to an ISO 8601 string."""
+    if unix_ts is None:
+        return ""
+    try:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(unix_ts)))
+    except (OSError, ValueError, OverflowError):
+        return ""
+
+
 async def _read_sse_lines(response: httpx.Response) -> AsyncIterator[str]:
     """Read lines from an SSE response, handling ``\\r\\n`` and ``\\n`` endings."""
     buffer = ""
@@ -194,3 +164,7 @@ async def _read_sse_lines(response: httpx.Response) -> AsyncIterator[str]:
             yield line
     if buffer.strip():
         yield buffer.rstrip("\r")
+
+
+# Backward-compatible re-exports for tests.
+_SSEAdapter = SSEAdapter

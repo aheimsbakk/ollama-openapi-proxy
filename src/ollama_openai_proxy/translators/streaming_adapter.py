@@ -101,6 +101,11 @@ class SSEAdapter:
             delta_content = delta.get("content")
             if delta_content:
                 self.content += delta_content
+        elif "reasoning_content" in delta:
+            # llama.cpp sends reasoning_content instead of content
+            delta_reasoning = delta.get("reasoning_content")
+            if delta_reasoning:
+                self.content += delta_reasoning
         elif "text" in choice:
             delta_text = choice.get("text")
             if delta_text:

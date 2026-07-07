@@ -40,7 +40,9 @@ def create_app(config: Config) -> FastAPI:
     app.add_exception_handler(Exception, global_exception_handler)
 
     # Create the upstream HTTP client and register it as a dependency.
-    upstream = UpstreamClient(timeout_seconds=config.request_timeout)
+    upstream = UpstreamClient(
+        base_url=config.upstream_url, timeout_seconds=config.request_timeout
+    )
     set_upstream_client(upstream)
 
     # Register all Ollama API routes.

@@ -155,6 +155,7 @@ class _MockUpstreamClient(UpstreamClient):
     def __init__(self) -> None:
         # Skip parent __init__ — we don't need a real httpx client
         self._timeout = None
+        self._base_url = "http://127.0.0.1:19999/v1"
         self._client = _MockHTTPClient()
         # Response overrides keyed by (method, path)
         self._responses: dict[tuple[str, str], dict[str, Any]] = {}

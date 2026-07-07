@@ -29,3 +29,6 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+
+# Runtime artifacts
+proxy_err.log

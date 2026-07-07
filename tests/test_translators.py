@@ -242,3 +242,206 @@ class TestSimpleHash:
 
     def test_empty_string(self) -> None:
         assert resp_trans._simple_hash("") == "0" * 16
+        assert resp_trans._simple_hash("model-a") == resp_trans._simple_hash("model-a")
+
+
+class TestExtractCapabilities:
+    """Tests for the _extract_capabilities helper."""
+
+    def test_text_only_gets_tools(self) -> None:
+        arch = {"output_modalities": ["text"], "input_modalities": ["text"]}
+        assert resp_trans._extract_capabilities(arch) == ["tools"]
+
+    def test_vision_adds_vision_capability(self) -> None:
+        arch = {
+            "output_modalities": ["text"],
+            "input_modalities": ["text", "image"],
+        }
+        caps = resp_trans._extract_capabilities(arch)
+        assert "tools" in caps
+        assert "vision" in caps
+
+    def test_no_architecture_returns_empty(self) -> None:
+        assert resp_trans._extract_capabilities({}) == []
+
+    def test_non_text_output_no_capabilities(self) -> None:
+        arch = {"output_modalities": ["embedding"], "input_modalities": ["text"]}
+        assert resp_trans._extract_capabilities(arch) == []
+
+
+class TestFormatParameterSize:
+    """Tests for the _format_parameter_size helper."""
+
+    def test_none_returns_empty(self) -> None:
+        assert resp_trans._format_parameter_size(None) == ""
+
+    def test_zero_returns_empty(self) -> None:
+        assert resp_trans._format_parameter_size(0) == ""
+
+    def test_billions_formatted_as_B(self) -> None:
+        assert resp_trans._format_parameter_size(25_233_142_046) == "25.2B"
+
+    def test_millions_formatted_as_M(self) -> None:
+        assert resp_trans._format_parameter_size(3_000_000) == "3.0M"
+
+    def test_small_numbers_returned_as_is(self) -> None:
+        assert resp_trans._format_parameter_size(500) == "500"
+
+
+class TestModelsListToTagsCapabilities:
+    """models_list_to_tags populates capabilities from architecture."""
+
+    def test_vision_model_tags(self) -> None:
+        body = {
+            "data": [
+                {
+                    "id": "gemma-4",
+                    "created": 1720000000,
+                    "architecture": {
+                        "input_modalities": ["text", "image"],
+                        "output_modalities": ["text"],
+                    },
+                    "meta": {
+                        "n_params": 25_233_142_046,
+                        "size": 16_995_155_064,
+                        "ftype": "Q4_K - Medium",
+                    },
+                },
+            ],
+        }
+        result = resp_trans.models_list_to_tags(body)
+        model = result["models"][0]
+        assert model["name"] == "gemma-4"
+        assert model["size"] == 16_995_155_064
+        assert model["details"]["parameter_size"] == "25.2B"
+        assert model["details"]["quantization_level"] == "Q4_K - Medium"
+        assert model["details"]["capabilities"] == ["tools", "vision"]
+
+    def test_text_only_model_tags(self) -> None:
+        body = {
+            "data": [
+                {
+                    "id": "llama-3.2-3b",
+                    "created": 1720000000,
+                    "architecture": {
+                        "input_modalities": ["text"],
+                        "output_modalities": ["text"],
+                    },
+                },
+            ],
+        }
+        result = resp_trans.models_list_to_tags(body)
+        model = result["models"][0]
+        assert model["details"]["capabilities"] == ["tools"]
+        assert "vision" not in model["details"]["capabilities"]
+        assert model["size"] == 0  # no meta
+
+    def test_no_architecture_defaults_no_capabilities_key(self) -> None:
+        """When architecture is absent, capabilities key is not set."""
+        body = {
+            "data": [
+                {"id": "test-model", "created": 1720000000},
+            ],
+        }
+        result = resp_trans.models_list_to_tags(body)
+        assert "capabilities" not in result["models"][0]["details"]
+
+
+class TestModelsShowToShow:
+    """Tests for models_show_to_show with upstream metadata."""
+
+    def test_with_full_upstream_data(self) -> None:
+        body = {
+            "id": "gemma-4",
+            "created": 1783455247,
+            "owned_by": "llamacpp",
+            "architecture": {
+                "input_modalities": ["text", "image"],
+                "output_modalities": ["text"],
+            },
+            "meta": {
+                "n_params": 25_233_142_046,
+                "n_ctx": 256_000,
+                "n_embd": 2816,
+                "n_vocab": 262_144,
+                "size": 16_995_155_064,
+                "ftype": "Q4_K - Medium",
+            },
+            "status": {
+                "preset": "[gemma-4]\ntemperature = 1.0\n",
+            },
+        }
+        result = resp_trans.models_show_to_show(body)
+        assert result["model"] == "gemma-4"
+        assert result["modelfile"] == "[gemma-4]\ntemperature = 1.0\n"
+        assert "tools" in result["details"]["capabilities"]
+        assert "vision" in result["details"]["capabilities"]
+        assert result["model_info"]["general.parameter_count"] == 25_233_142_046
+        assert result["model_info"]["general.file_type"] == "Q4_K - Medium"
+        assert result["model_info"]["llm.context_length"] == 256_000
+        assert result["model_info"]["llm.embedding_length"] == 2816
+        assert result["model_info"]["general.vocab_size"] == 262_144
+        assert result["model_info"]["general.size"] == 16_995_155_064
+        assert result["projector_info"] == {}
+
+    def test_minimal_data(self) -> None:
+        body = {"id": "test-model", "created": 1720000000}
+        result = resp_trans.models_show_to_show(body)
+        assert result["model"] == "test-model"
+        assert result["model_info"] == {}
+        assert result["modelfile"] == ""
+        assert "capabilities" not in result.get("details", {})
+
+    def test_context_length_from_args_fallback(self) -> None:
+        """Unloaded model gets context_length from status.args --ctx-size."""
+        body = {
+            "id": "qwen-3.6-think-coding",
+            "created": 1783455247,
+            "architecture": {
+                "input_modalities": ["text"],
+                "output_modalities": ["text"],
+            },
+            "status": {
+                "args": [
+                    "/app/llama-server",
+                    "--ctx-size",
+                    "256000",
+                    "--alias",
+                    "qwen-3.6-think-coding",
+                ],
+            },
+        }
+        result = resp_trans.models_show_to_show(body)
+        assert result["model_info"]["llm.context_length"] == 256_000
+        assert result["model_info"]["general.architecture"] == "qwen"
+        assert result["model_info"]["general.name"] == "qwen-3.6-think-coding"
+
+    def test_meta_takes_precedence_over_args(self) -> None:
+        """When both meta.n_ctx and status.args are present, meta wins."""
+        body = {
+            "id": "test-model",
+            "created": 1783455247,
+            "meta": {"n_ctx": 128_000},
+            "status": {"args": ["--ctx-size", "999999"]},
+        }
+        result = resp_trans.models_show_to_show(body)
+        assert result["model_info"]["llm.context_length"] == 128_000
+
+
+class TestExtractCtxFromArgs:
+    """Tests for the _extract_ctx_from_args helper."""
+
+    def test_ctx_size_found(self) -> None:
+        args = ["--ctx-size", "256000", "--alias", "test"]
+        assert resp_trans._extract_ctx_from_args(args) == 256_000
+
+    def test_no_ctx_size(self) -> None:
+        args = ["--alias", "test", "--temperature", "1.0"]
+        assert resp_trans._extract_ctx_from_args(args) == 0
+
+    def test_empty_args(self) -> None:
+        assert resp_trans._extract_ctx_from_args([]) == 0
+
+    def test_non_numeric_value(self) -> None:
+        args = ["--ctx-size", "not-a-number"]
+        assert resp_trans._extract_ctx_from_args(args) == 0

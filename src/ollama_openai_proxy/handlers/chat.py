@@ -61,7 +61,7 @@ async def _handle_chat_non_stream(
     client: UpstreamClient,
 ) -> JSONResponse:
     """Handle non-streaming /api/chat requests."""
-    upstream_url = f"{client._client.base_url}/chat/completions"
+    upstream_url = f"{client.base_url}/chat/completions"
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.chat_completion_to_chat(openai_response)
     return JSONResponse(content=ollama_response)
@@ -74,7 +74,7 @@ async def _handle_chat_stream(
     client: UpstreamClient,
 ) -> StreamingResponse:
     """Handle streaming /api/chat requests."""
-    upstream_url = f"{client._client.base_url}/chat/completions"
+    upstream_url = f"{client.base_url}/chat/completions"
     upstream_response = await client.stream_post(upstream_url, json=openai_body)
 
     return StreamingResponse(

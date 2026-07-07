@@ -61,7 +61,7 @@ async def _handle_generate_non_stream(
     client: UpstreamClient,
 ) -> JSONResponse:
     """Handle non-streaming /api/generate requests."""
-    upstream_url = f"{client._client.base_url}/completions"
+    upstream_url = f"{client.base_url}/completions"
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.completion_to_generate(openai_response)
     return JSONResponse(content=ollama_response)
@@ -74,7 +74,7 @@ async def _handle_generate_stream(
     client: UpstreamClient,
 ) -> StreamingResponse:
     """Handle streaming /api/generate requests."""
-    upstream_url = f"{client._client.base_url}/completions"
+    upstream_url = f"{client.base_url}/completions"
     upstream_response = await client.stream_post(upstream_url, json=openai_body)
 
     return StreamingResponse(

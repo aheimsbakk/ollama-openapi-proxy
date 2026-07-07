@@ -19,11 +19,17 @@ class UpstreamClient:
     All calls use the configured timeout.
     """
 
-    def __init__(self, timeout_seconds: int) -> None:
+    def __init__(self, base_url: str, timeout_seconds: int) -> None:
+        self._base_url = base_url.rstrip("/")
         self._timeout = httpx.Timeout(
             connect=10, read=timeout_seconds, write=10, pool=10
         )
         self._client = httpx.AsyncClient(timeout=self._timeout)
+
+    @property
+    def base_url(self) -> str:
+        """Return the upstream base URL."""
+        return self._base_url
 
     async def get(self, url: str) -> dict[str, Any]:
         """Send a GET request and return the JSON body as a dict."""

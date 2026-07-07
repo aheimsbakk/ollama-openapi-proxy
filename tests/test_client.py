@@ -18,7 +18,7 @@ class TestClientGet:
     @pytest.mark.asyncio
     async def test_get_success(self) -> None:
         """A successful GET returns the JSON body."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             200,
             json={"models": [{"id": "test"}]},
@@ -34,7 +34,7 @@ class TestClientGet:
     @pytest.mark.asyncio
     async def test_get_connect_error(self) -> None:
         """A connection error raises AppError(502)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.get = AsyncMock(
             side_effect=httpx.ConnectError("connection refused")
         )
@@ -48,7 +48,7 @@ class TestClientGet:
     @pytest.mark.asyncio
     async def test_get_timeout(self) -> None:
         """A timeout raises AppError(504)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.get = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
 
         with pytest.raises(AppError) as exc_info:
@@ -60,7 +60,7 @@ class TestClientGet:
     @pytest.mark.asyncio
     async def test_get_non_200_json_error(self) -> None:
         """A non-200 response with JSON body raises AppError with the error message."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             500,
             json={"error": "upstream crashed"},
@@ -78,7 +78,7 @@ class TestClientGet:
     @pytest.mark.asyncio
     async def test_get_non_200_non_json_error(self) -> None:
         """A non-200 response with non-JSON body raises AppError with raw text."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             502,
             content=b"Bad Gateway",
@@ -100,7 +100,7 @@ class TestClientPost:
     @pytest.mark.asyncio
     async def test_post_success(self) -> None:
         """A successful POST returns the JSON body."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             200,
             json={"model": "test", "response": "ok"},
@@ -118,7 +118,7 @@ class TestClientPost:
     @pytest.mark.asyncio
     async def test_post_connect_error(self) -> None:
         """A connection error raises AppError(502)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.post = AsyncMock(
             side_effect=httpx.ConnectError("connection refused")
         )
@@ -132,7 +132,7 @@ class TestClientPost:
     @pytest.mark.asyncio
     async def test_post_timeout(self) -> None:
         """A timeout raises AppError(504)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.post = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
 
         with pytest.raises(AppError) as exc_info:
@@ -144,7 +144,7 @@ class TestClientPost:
     @pytest.mark.asyncio
     async def test_post_non_200_json_error(self) -> None:
         """A non-200 response with JSON body raises AppError."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             429,
             json={"error": "rate limit exceeded"},
@@ -162,7 +162,7 @@ class TestClientPost:
     @pytest.mark.asyncio
     async def test_post_non_200_non_json_error(self) -> None:
         """A non-200 response with non-JSON body falls back to raw text."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             503,
             content=b"<html>Service Unavailable</html>",
@@ -184,7 +184,7 @@ class TestClientStreamPost:
     @pytest.mark.asyncio
     async def test_stream_post_success(self) -> None:
         """A successful stream POST returns the raw httpx.Response."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             200,
             json={"dummy": True},
@@ -203,7 +203,7 @@ class TestClientStreamPost:
     @pytest.mark.asyncio
     async def test_stream_post_connect_error(self) -> None:
         """A connection error raises AppError(502)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.post = AsyncMock(
             side_effect=httpx.ConnectError("connection refused")
         )
@@ -219,7 +219,7 @@ class TestClientStreamPost:
     @pytest.mark.asyncio
     async def test_stream_post_timeout(self) -> None:
         """A timeout raises AppError(504)."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         client._client.post = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
 
         with pytest.raises(AppError) as exc_info:
@@ -233,10 +233,10 @@ class TestClientStreamPost:
     @pytest.mark.asyncio
     async def test_stream_post_non_200_json_error(self) -> None:
         """A non-200 response with JSON body raises AppError with the error message."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
-            400,
-            json={"error": "invalid model"},
+            500,
+            json={"error": "upstream crashed"},
             headers={"content-type": "application/json"},
         )
         client._client.post = AsyncMock(return_value=mock_response)
@@ -246,14 +246,14 @@ class TestClientStreamPost:
                 "http://upstream/v1/chat/completions", json={"stream": True}
             )
 
-        assert exc_info.value.status_code == 400
-        assert "invalid model" in str(exc_info.value)
+        assert exc_info.value.status_code == 500
+        assert "upstream crashed" in str(exc_info.value)
         await client.close()
 
     @pytest.mark.asyncio
     async def test_stream_post_non_200_non_json_error(self) -> None:
         """A non-200 response with non-JSON body raises AppError with string representation."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         mock_response = httpx.Response(
             500,
             content=b"Internal Server Error",
@@ -277,7 +277,7 @@ class TestClientClose:
     @pytest.mark.asyncio
     async def test_close(self) -> None:
         """close() calls aclose on the underlying client."""
-        client = UpstreamClient(timeout_seconds=30)
+        client = UpstreamClient(base_url="http://test", timeout_seconds=30)
         aclose_called = False
 
         async def mock_aclose() -> None:

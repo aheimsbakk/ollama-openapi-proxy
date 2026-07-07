@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.0] - 2026-07-07
+
+- **why:** Expose model capabilities, context length, and metadata so clients detect tool/vision support
+- **model:** deepseek-v4-flash-free
+- **tags:** models, capabilities, context-length, show
+
+### Added
+
+- `src/ollama_openai_proxy/translators/response.py` — `_extract_capabilities` helper reads `output_modalities`/`input_modalities` from upstream architecture to populate `["tools", "vision"]` on discovery endpoints.
+- `src/ollama_openai_proxy/translators/response.py` — `_format_parameter_size` helper converts raw `n_params` to human-readable strings (e.g. `"25.2B"`).
+- `src/ollama_openai_proxy/translators/response.py` — `_extract_ctx_from_args` parses `--ctx-size` from llama.cpp `status.args` as fallback for unloaded models.
+- `src/ollama_openai_proxy/translators/response.py` — `models_show_to_show` now populates `model_info` with `llm.context_length`, `llm.embedding_length`, `general.vocab_size`, `general.size`, and populates `modelfile` from `status.preset`; adds `projector_info` for multimodal models.
+- `tests/test_translators.py` — 14 new test cases across `TestExtractCapabilities`, `TestFormatParameterSize`, `TestModelsListToTagsCapabilities`, `TestModelsShowToShow`, `TestExtractCtxFromArgs`.
+- `tests/test_models.py` — `test_show_model_not_found` for 404 path.
+
+### Changed
+
+- `src/ollama_openai_proxy/handlers/models.py` — `handle_show` now fetches the model list from `/v1/models` and filters by ID instead of calling the per-model endpoint (which llama.cpp does not support).
+- `src/ollama_openai_proxy/translators/response.py` — `models_list_to_tags` populates `details.capabilities`, `size`, `details.parameter_size`, and `details.quantization_level` from upstream architecture and meta fields.
+
 ## [0.1.2] - 2026-07-07
 
 - **why:** Fix four streaming defects found during blueprint audit

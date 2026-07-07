@@ -52,13 +52,21 @@ class TestShow:
         self, client: TestClient, mock_client: _MockUpstreamClient
     ) -> None:
         """A valid show request returns Ollama-format model details."""
-        model_response = {
-            "id": "llama-3.2-3b",
-            "object": "model",
-            "created": 1720000000,
-            "owned_by": "library",
-        }
-        mock_client.on("GET", "/v1/models/llama-3.2-3b", model_response)
+        mock_client.on(
+            "GET",
+            "/v1/models",
+            {
+                "object": "list",
+                "data": [
+                    {
+                        "id": "llama-3.2-3b",
+                        "object": "model",
+                        "created": 1720000000,
+                        "owned_by": "library",
+                    },
+                ],
+            },
+        )
 
         response = client.post("/api/show", json={"model": "llama-3.2-3b"})
 
@@ -72,6 +80,17 @@ class TestShow:
         response = client.post("/api/show", json={})
         assert response.status_code == 400
         assert "detail" in response.json()
+
+    def test_show_model_not_found(
+        self, client: TestClient, mock_client: _MockUpstreamClient
+    ) -> None:
+        """Requesting a non-existent model returns 404."""
+        mock_client.on("GET", "/v1/models", {"object": "list", "data": []})
+
+        response = client.post("/api/show", json={"model": "nonexistent-model"})
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
 
 
 class TestPs:

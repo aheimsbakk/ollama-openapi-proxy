@@ -179,25 +179,48 @@ def models_list_to_tags(openai_body: dict[str, Any]) -> dict[str, Any]:
         created = item.get("created")
         family = _extract_family(model_id)
 
-        models.append(
-            {
-                "name": model_id,
-                "model": model_id,
-                "modified_at": _ts_to_iso8601(created),
-                "size": 0,
-                "digest": _simple_hash(model_id),
-                "details": {
-                    "parent_model": "",
-                    "format": "gguf",
-                    "family": family,
-                    "families": [family],
-                    "parameter_size": "",
-                    "quantization_level": "",
-                },
-            }
-        )
+        # Populate capabilities from architecture (present on all upstream models).
+        arch = item.get("architecture", {})
+        capabilities = _extract_capabilities(arch)
+
+        # Populate size and metadata from meta (only present on loaded models).
+        meta = item.get("meta", {})
+
+        entry: dict[str, Any] = {
+            "name": model_id,
+            "model": model_id,
+            "modified_at": _ts_to_iso8601(created),
+            "size": meta.get("size", 0),
+            "digest": _simple_hash(model_id),
+            "details": {
+                "parent_model": "",
+                "format": "gguf",
+                "family": family,
+                "families": [family],
+                "parameter_size": _format_parameter_size(meta.get("n_params")),
+                "quantization_level": meta.get("ftype", ""),
+            },
+        }
+        if capabilities:
+            entry["details"]["capabilities"] = capabilities
+        models.append(entry)
 
     return {"models": models}
+
+
+def _extract_ctx_from_args(args: list[str]) -> int:
+    """Extract context size from llama.cpp ``--ctx-size`` arg list.
+
+    Returns the value following ``--ctx-size`` in the args array,
+    or 0 if not found.
+    """
+    for i, arg in enumerate(args):
+        if arg == "--ctx-size" and i + 1 < len(args):
+            try:
+                return int(args[i + 1])
+            except (ValueError, TypeError):
+                return 0
+    return 0
 
 
 def models_show_to_show(openai_body: dict[str, Any]) -> dict[str, Any]:
@@ -207,25 +230,56 @@ def models_show_to_show(openai_body: dict[str, Any]) -> dict[str, Any]:
     owned_by = openai_body.get("owned_by", "")
     family = _extract_family(model_id)
 
+    meta = openai_body.get("meta", {})
+    arch = openai_body.get("architecture", {})
+    status = openai_body.get("status", {})
+    capabilities = _extract_capabilities(arch)
+
+    # Build model_info from available GGUF metadata.
+    # meta is only present for loaded models; fall back to status.args for
+    # context length when meta is not available.
+    model_info: dict[str, Any] = {}
+    ctx_length = meta.get("n_ctx", 0)
+    if not ctx_length:
+        ctx_length = _extract_ctx_from_args(status.get("args", []))
+
+    if meta or ctx_length:
+        model_info["general.architecture"] = family
+        model_info["general.name"] = model_id
+        model_info["general.parameter_count"] = meta.get("n_params", 0)
+        model_info["general.file_type"] = meta.get("ftype", "")
+        model_info["general.size"] = meta.get("size", 0)
+        model_info["general.vocab_size"] = meta.get("n_vocab", 0)
+        model_info["llm.context_length"] = ctx_length
+        model_info["llm.embedding_length"] = meta.get("n_embd", 0)
+
+    # Use upstream's preset string as a close equivalent to a Modelfile.
+    modelfile = status.get("preset", "")
+
     result: dict[str, Any] = {
         "model": model_id,
         "modified_at": _ts_to_iso8601(created),
         "template": "",
-        "modelfile": "",
+        "modelfile": modelfile,
         "parameters": "",
-        "model_info": {},
+        "model_info": model_info,
         "details": {
             "parent_model": "",
             "format": "gguf",
             "family": family,
             "families": [family],
-            "parameter_size": "",
-            "quantization_level": "",
+            "parameter_size": meta.get("n_params", 0),
+            "quantization_level": meta.get("ftype", ""),
         },
     }
 
     if owned_by:
         result["details"]["parent_model"] = owned_by
+    if capabilities:
+        result["details"]["capabilities"] = capabilities
+    # Add projector_info placeholder for multimodal models.
+    if "image" in arch.get("input_modalities", []):
+        result["projector_info"] = {}
 
     return result
 
@@ -240,6 +294,37 @@ def models_list_to_ps(openai_body: dict[str, Any]) -> dict[str, Any]:
         model["expires_at"] = "2099-12-31T23:59:59Z"
         model["size_vram"] = 0
     return tags
+
+
+def _extract_capabilities(arch: dict[str, Any]) -> list[str]:
+    """Extract model capabilities from the upstream architecture descriptor.
+
+    Returns a list of capability strings (e.g. ``["tools", "vision"]``).
+    Returns an empty list when no architecture data is available.
+    """
+    if not arch:
+        return []
+    caps: list[str] = []
+    output_mods = arch.get("output_modalities", [])
+    input_mods = arch.get("input_modalities", [])
+    # Text-output chat models are assumed to support tools.
+    if "text" in output_mods:
+        caps.append("tools")
+    # Multimodal models with image input support vision.
+    if "image" in input_mods:
+        caps.append("vision")
+    return caps
+
+
+def _format_parameter_size(n_params: int | None) -> str:
+    """Format a parameter count into a human-readable string like ``"25.2B"``."""
+    if n_params is None or n_params <= 0:
+        return ""
+    if n_params >= 1_000_000_000:
+        return f"{n_params / 1_000_000_000:.1f}B"
+    if n_params >= 1_000_000:
+        return f"{n_params / 1_000_000:.1f}M"
+    return str(n_params)
 
 
 def _extract_family(model_id: str) -> str:

@@ -25,7 +25,7 @@ async def handle_embed(
     """Handle POST /api/embed requests."""
     ollama_body = await _parse_body(request)
     openai_body = req_trans.embed_to_embeddings(ollama_body)
-    upstream_url = f"{client._client.base_url}/embeddings"
+    upstream_url = f"{client.base_url}/embeddings"
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.embeddings_to_embed(openai_response)
     return JSONResponse(content=ollama_response)
@@ -38,7 +38,7 @@ async def handle_embeddings_legacy(
     """Handle POST /api/embeddings (legacy) requests."""
     ollama_body = await _parse_body(request)
     openai_body = req_trans.embeddings_legacy_to_embeddings(ollama_body)
-    upstream_url = f"{client._client.base_url}/embeddings"
+    upstream_url = f"{client.base_url}/embeddings"
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.embeddings_legacy_to_embeddings(openai_response)
     return JSONResponse(content=ollama_response)

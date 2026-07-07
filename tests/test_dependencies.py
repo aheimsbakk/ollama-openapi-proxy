@@ -34,7 +34,7 @@ class TestGetUpstreamClient:
 
         original = deps._upstream_client
         try:
-            client = UpstreamClient(timeout_seconds=30)
+            client = UpstreamClient(base_url="http://test", timeout_seconds=30)
             set_upstream_client(client)
             result = get_upstream_client()
             assert result is client
@@ -51,7 +51,7 @@ class TestSetUpstreamClient:
 
         original = deps._upstream_client
         try:
-            client = UpstreamClient(timeout_seconds=60)
+            client = UpstreamClient(base_url="http://test", timeout_seconds=60)
             set_upstream_client(client)
             assert deps._upstream_client is client
         finally:

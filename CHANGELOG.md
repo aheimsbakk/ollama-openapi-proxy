@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.0] - 2026-07-07
+
+- **why:** Implement the full Ollama-to-OpenAI API translation proxy with 15 endpoints, streaming support, and test coverage.
+- **model:** llama-cpp/qwen-3.6-think-coding
+- **tags:** implementation, proxy, ollama, openai, fastapi, streaming
+
+### Added
+
+- `src/ollama_openai_proxy/` — Python package with CLI, server, router, client, error handling, and configuration modules.
+- `src/ollama_openai_proxy/handlers/` — Per-endpoint handlers for `/api/generate`, `/api/chat`, `/api/embed`, `/api/embeddings`, `/api/tags`, `/api/show`, `/api/ps`, and `/api/version`.
+- `src/ollama_openai_proxy/translators/` — Request translators (Ollama to OpenAI), response translators (OpenAI to Ollama), and SSE-to-NDJSON streaming adapter.
+- `tests/` — 66 tests covering all handlers, translators, streaming adapter, error handling, and unsupported endpoints.
+- `scripts/verify_codebase_sync.sh` — validates that all paths listed in `CODEBASE.md` exist on disk.
+
+### Changed
+
+- `CODEBASE.md` — updated directory tree, dependency manifest (replaced deprecated `tool.uv.dev-dependencies` with `dependency-groups.dev`), and added `dependencies.py` module.
+
 ## [0.0.0] - 2026-07-07
 
 - **why:** Initial project setup with architecture specification, documentation, and tooling. No implementation code.

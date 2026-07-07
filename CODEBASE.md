@@ -34,8 +34,8 @@ ollama-openai-proxy = "ollama_openai_proxy.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=9,<10",
     "pytest-asyncio>=1,<2",
     "httpx>=0.27,<1",          # also used in tests for TestClient
@@ -73,6 +73,14 @@ work/                                   # Repository root
 │       │   REQUEST_TIMEOUT. Verbosity sets logging level (default: ERROR).
 │       │
 │       ├── config.py                  # Config dataclass loaded from env/args
+│       │   Maps to: External Configuration (Blueprint §6)
+│       │   Merges CLI args with env vars; env vars take precedence over
+│       │   defaults, CLI args take precedence over env vars.
+│       │
+│       ├── dependencies.py            # FastAPI dependency injection for upstream client
+│       │   Maps to: HTTP Client (Blueprint §2)
+│       │   Provides: get_upstream_client() dependency, set_upstream_client() setter.
+│       │   Breaks circular import between server.py and handlers/*.py.
 │       │   Maps to: External Configuration (Blueprint §6)
 │       │   Merges CLI args with env vars; env vars take precedence over
 │       │   defaults, CLI args take precedence over env vars.

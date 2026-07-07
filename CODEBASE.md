@@ -178,9 +178,13 @@ work/                                   # Repository root
 │   ├── test_chat.py                   # Unit tests for /api/chat pipeline
 │   ├── test_embed.py                  # Unit tests for /api/embed pipeline
 │   ├── test_models.py                 # Unit tests for /api/tags, /api/show, /api/ps
-│   ├── test_streaming.py             # Unit tests for streaming adapter
+│   ├── test_errors.py                # Error handling & boundary tests
+│   ├── test_client.py                # UpstreamClient HTTP client tests
+│   ├── test_dependencies.py          # Dependency injection tests
 │   ├── test_translators.py           # Pure-function tests for translators
-│   └── test_errors.py                # Error handling & boundary tests
+│   ├── test_request_translator_edge_cases.py  # Request translation edge cases
+│   ├── test_streaming.py             # Streaming adapter unit tests
+│   └── test_streaming_edge_cases.py  # Streaming adapter integration & edge cases
 │
 └── scripts/
     └── verify_codebase_sync.sh        # Validates CODEBASE.md paths exist

@@ -117,9 +117,7 @@ class UpstreamClient:
             except Exception:
                 body = body_text.decode(errors="replace")
             error_msg = (
-                body.get("error", str(body))
-                if isinstance(body, (dict, str))
-                else str(body)
+                body.get("error", str(body)) if isinstance(body, dict) else str(body)
             )
             raise AppError(
                 f"upstream returned {response.status_code}: {error_msg}",

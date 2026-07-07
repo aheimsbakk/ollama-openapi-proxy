@@ -23,5 +23,9 @@ build/
 .DS_Store
 Thumbs.db
 
-# Temporary AI-generated workflow files
-.handoff/
+# Test coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/

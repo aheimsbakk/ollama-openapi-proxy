@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
+
+logger = logging.getLogger("ollama_openai_proxy")
 
 
 @dataclass(frozen=True)
@@ -42,10 +45,20 @@ def load_config(
     )
     req_timeout = int(timeout or os.environ.get("REQUEST_TIMEOUT", "300"))
 
-    return Config(
+    cfg = Config(
         listen_host=listen_host,
         listen_port=listen_port,
         upstream_url=upstream,
         request_timeout=req_timeout,
         verbosity=verbosity,
     )
+
+    logger.info(
+        "Configuration loaded: host=%s port=%s upstream=%s timeout=%s verbosity=%s",
+        cfg.listen_host,
+        cfg.listen_port,
+        cfg.upstream_url,
+        cfg.request_timeout,
+        cfg.verbosity,
+    )
+    return cfg

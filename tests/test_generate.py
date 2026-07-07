@@ -41,11 +41,13 @@ class TestGenerateNonStreaming:
         assert response.status_code == 400
         assert "detail" in response.json()
 
-    def test_generate_missing_prompt(self, client: TestClient) -> None:
-        """Missing prompt field returns 400."""
-        response = client.post("/api/generate", json={"model": "test"})
-        assert response.status_code == 400
-        assert "detail" in response.json()
+    def test_generate_without_prompt(self, client: TestClient) -> None:
+        """Request without prompt (model load/unload) is valid — prompt is optional."""
+        response = client.post("/api/generate", json={"model": "llama-3.2-3b"})
+        # No 400 — prompt is optional; request is forwarded to upstream
+        assert response.status_code == 200
+        body = response.json()
+        assert body["model"] == "llama-3.2-3b"
 
     def test_generate_invalid_json(self, client: TestClient) -> None:
         """Invalid JSON body returns 400."""

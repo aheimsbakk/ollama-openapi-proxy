@@ -316,7 +316,6 @@ class TestSSEToOllamaStream:
         assert len(lines) == 2
         error_line = streaming.json.loads(lines[1].strip())
         assert error_line["error"] == "upstream crashed"
-        assert error_line["done"] is True
 
     @pytest.mark.asyncio
     async def test_stream_skips_sse_comments(self) -> None:

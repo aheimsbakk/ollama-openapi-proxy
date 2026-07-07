@@ -12,6 +12,16 @@ from ollama_openai_proxy.errors import AppError
 logger = logging.getLogger("ollama_openai_proxy")
 
 
+def _truncate_body(body: dict[str, Any] | None, max_len: int = 500) -> str:
+    """Truncate a JSON body to max_len characters for logging."""
+    if body is None:
+        return "None"
+    text = str(body)
+    if len(text) > max_len:
+        return text[:max_len] + "..."
+    return text
+
+
 class UpstreamClient:
     """Async HTTP client with timeout and error handling for upstream calls.
 
@@ -33,17 +43,22 @@ class UpstreamClient:
 
     async def get(self, url: str) -> dict[str, Any]:
         """Send a GET request and return the JSON body as a dict."""
+        logger.info("Upstream GET %s", url)
         try:
             response = await self._client.get(url)
         except httpx.ConnectError as exc:
-            raise AppError(
-                f"upstream server unreachable: {exc}", status_code=502
-            ) from exc
+            logger.error("Upstream GET %s — connection failed: %s", url, exc)
+            raise AppError(f"AI server unreachable: {exc}", status_code=502) from exc
         except httpx.TimeoutException as exc:
+            logger.error(
+                "Upstream GET %s — timed out after %ss", url, self._timeout.read
+            )
             raise AppError(
-                f"upstream request timed out after {self._timeout.read} seconds",
+                f"Request to AI server timed out after {self._timeout.read} seconds",
                 status_code=504,
             ) from exc
+
+        logger.debug("Upstream GET %s — status=%s", url, response.status_code)
 
         if response.status_code != 200:
             body = (
@@ -56,8 +71,14 @@ class UpstreamClient:
                 if isinstance(body, dict)
                 else response.text
             )
+            logger.warning(
+                "Upstream GET %s — non-200: %s — %s",
+                url,
+                response.status_code,
+                error_msg,
+            )
             raise AppError(
-                f"upstream returned {response.status_code}: {error_msg}",
+                f"AI server returned {response.status_code}: {error_msg}",
                 status_code=response.status_code,
             )
 
@@ -67,17 +88,24 @@ class UpstreamClient:
         self, url: str, json: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Send a POST request with a JSON body and return the response body as a dict."""
+        logger.info("Upstream POST %s", url)
+        logger.debug("Upstream POST %s — body: %s", url, _truncate_body(json))
+
         try:
             response = await self._client.post(url, json=json)
         except httpx.ConnectError as exc:
-            raise AppError(
-                f"upstream server unreachable: {exc}", status_code=502
-            ) from exc
+            logger.error("Upstream POST %s — connection failed: %s", url, exc)
+            raise AppError(f"AI server unreachable: {exc}", status_code=502) from exc
         except httpx.TimeoutException as exc:
+            logger.error(
+                "Upstream POST %s — timed out after %ss", url, self._timeout.read
+            )
             raise AppError(
-                f"upstream request timed out after {self._timeout.read} seconds",
+                f"Request to AI server timed out after {self._timeout.read} seconds",
                 status_code=504,
             ) from exc
+
+        logger.debug("Upstream POST %s — status=%s", url, response.status_code)
 
         if response.status_code != 200:
             body = (
@@ -90,8 +118,14 @@ class UpstreamClient:
                 if isinstance(body, dict)
                 else response.text
             )
+            logger.warning(
+                "Upstream POST %s — non-200: %s — %s",
+                url,
+                response.status_code,
+                error_msg,
+            )
             raise AppError(
-                f"upstream returned {response.status_code}: {error_msg}",
+                f"AI server returned {response.status_code}: {error_msg}",
                 status_code=response.status_code,
             )
 
@@ -104,17 +138,28 @@ class UpstreamClient:
 
         The caller is responsible for reading and closing the response stream.
         """
+        logger.info("Upstream streaming POST %s", url)
+        logger.debug("Upstream streaming POST %s — body: %s", url, _truncate_body(json))
+
         try:
             response = await self._client.post(url, json=json, follow_redirects=False)
         except httpx.ConnectError as exc:
-            raise AppError(
-                f"upstream server unreachable: {exc}", status_code=502
-            ) from exc
+            logger.error("Upstream streaming POST %s — connection failed: %s", url, exc)
+            raise AppError(f"AI server unreachable: {exc}", status_code=502) from exc
         except httpx.TimeoutException as exc:
+            logger.error(
+                "Upstream streaming POST %s — timed out after %ss",
+                url,
+                self._timeout.read,
+            )
             raise AppError(
-                f"upstream request timed out after {self._timeout.read} seconds",
+                f"Request to AI server timed out after {self._timeout.read} seconds",
                 status_code=504,
             ) from exc
+
+        logger.debug(
+            "Upstream streaming POST %s — status=%s", url, response.status_code
+        )
 
         if response.status_code != 200:
             body_text = await response.aread()
@@ -125,13 +170,21 @@ class UpstreamClient:
             error_msg = (
                 body.get("error", str(body)) if isinstance(body, dict) else str(body)
             )
+            logger.warning(
+                "Upstream streaming POST %s — non-200: %s — %s",
+                url,
+                response.status_code,
+                error_msg,
+            )
             raise AppError(
-                f"upstream returned {response.status_code}: {error_msg}",
+                f"AI server returned {response.status_code}: {error_msg}",
                 status_code=response.status_code,
             )
 
+        logger.debug("Upstream streaming POST %s — stream opened", url)
         return response
 
     async def close(self) -> None:
         """Close the underlying httpx client and release connections."""
+        logger.debug("Closing upstream HTTP client")
         await self._client.aclose()

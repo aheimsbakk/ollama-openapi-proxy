@@ -7,16 +7,22 @@ OpenAI response body (dict) and returns an Ollama response body (dict).
 from __future__ import annotations
 
 import json
+import logging
 import time
 from typing import Any
 
+logger = logging.getLogger("ollama_openai_proxy")
+
 
 def _ts_to_iso8601(unix_ts: int | float | None) -> str:
-    """Convert a Unix timestamp (integer seconds) to an ISO 8601 string."""
+    """Convert a Unix timestamp (integer seconds) to an ISO 8601 string.
+
+    Uses second-precision with .000000Z to match Ollama's sub-second format.
+    """
     if unix_ts is None:
         return ""
     try:
-        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(unix_ts)))
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000000Z", time.gmtime(int(unix_ts)))
     except (OSError, ValueError, OverflowError):
         return ""
 
@@ -25,8 +31,12 @@ def completion_to_generate(openai_body: dict[str, Any]) -> dict[str, Any]:
     """Translate an OpenAI /v1/completions response to Ollama /api/generate format."""
     choices = openai_body.get("choices", [])
     usage = openai_body.get("usage", {})
+    logger.debug("translate completion_to_generate — %d choice(s)", len(choices))
 
     if not choices:
+        logger.debug(
+            "translate completion_to_generate — empty choices, returning default"
+        )
         return {
             "model": openai_body.get("model", ""),
             "response": "",
@@ -57,6 +67,12 @@ def completion_to_generate(openai_body: dict[str, Any]) -> dict[str, Any]:
         "eval_duration": 0,
     }
 
+    logger.debug(
+        "translate completion_to_generate — done_reason=%s tokens=%d/%d",
+        result["done_reason"],
+        result["prompt_eval_count"],
+        result["eval_count"],
+    )
     return result
 
 
@@ -64,8 +80,12 @@ def chat_completion_to_chat(openai_body: dict[str, Any]) -> dict[str, Any]:
     """Translate an OpenAI /v1/chat/completions response to Ollama /api/chat format."""
     choices = openai_body.get("choices", [])
     usage = openai_body.get("usage", {})
+    logger.debug("translate chat_completion_to_chat — %d choice(s)", len(choices))
 
     if not choices:
+        logger.debug(
+            "translate chat_completion_to_chat — empty choices, returning default"
+        )
         return {
             "model": openai_body.get("model", ""),
             "message": {"role": "assistant", "content": ""},
@@ -88,6 +108,9 @@ def chat_completion_to_chat(openai_body: dict[str, Any]) -> dict[str, Any]:
     tool_calls = message.get("tool_calls", None)
     if tool_calls:
         tool_calls = _parse_tool_call_arguments(tool_calls)
+        logger.debug(
+            "translate chat_completion_to_chat — %d tool call(s)", len(tool_calls)
+        )
 
     content = message.get("content", "") or ""
 
@@ -111,6 +134,12 @@ def chat_completion_to_chat(openai_body: dict[str, Any]) -> dict[str, Any]:
     if tool_calls:
         result["message"]["tool_calls"] = tool_calls
 
+    logger.debug(
+        "translate chat_completion_to_chat — done_reason=%s tokens=%d/%d",
+        result["done_reason"],
+        result["prompt_eval_count"],
+        result["eval_count"],
+    )
     return result
 
 
@@ -137,6 +166,11 @@ def embeddings_to_embed(openai_body: dict[str, Any]) -> dict[str, Any]:
     usage = openai_body.get("usage", {})
 
     embeddings = [item["embedding"] for item in data if "embedding" in item]
+    logger.debug(
+        "translate embeddings_to_embed — %d embedding(s), %d tokens",
+        len(embeddings),
+        usage.get("prompt_tokens", 0),
+    )
 
     result: dict[str, Any] = {
         "model": openai_body.get("model", ""),
@@ -158,6 +192,10 @@ def embeddings_legacy_to_embeddings(openai_body: dict[str, Any]) -> dict[str, An
     usage = openai_body.get("usage", {})
 
     embedding = data[0]["embedding"] if data and "embedding" in data[0] else []
+    logger.debug(
+        "translate embeddings_legacy_to_embeddings — %d tokens",
+        usage.get("prompt_tokens", 0),
+    )
 
     result: dict[str, Any] = {
         "model": openai_body.get("model", ""),
@@ -205,6 +243,7 @@ def models_list_to_tags(openai_body: dict[str, Any]) -> dict[str, Any]:
             entry["details"]["capabilities"] = capabilities
         models.append(entry)
 
+    logger.debug("translate models_list_to_tags — %d model(s)", len(models))
     return {"models": models}
 
 
@@ -225,6 +264,7 @@ def _extract_ctx_from_args(args: list[str]) -> int:
 
 def models_show_to_show(openai_body: dict[str, Any]) -> dict[str, Any]:
     """Translate an OpenAI single model response to Ollama /api/show format."""
+    logger.debug("translate models_show_to_show — model=%s", openai_body.get("id", ""))
     model_id = openai_body.get("id", "")
     created = openai_body.get("created")
     owned_by = openai_body.get("owned_by", "")
@@ -276,7 +316,7 @@ def models_show_to_show(openai_body: dict[str, Any]) -> dict[str, Any]:
     if owned_by:
         result["details"]["parent_model"] = owned_by
     if capabilities:
-        result["details"]["capabilities"] = capabilities
+        result["capabilities"] = capabilities
     # Add projector_info placeholder for multimodal models.
     if "image" in arch.get("input_modalities", []):
         result["projector_info"] = {}
@@ -293,6 +333,9 @@ def models_list_to_ps(openai_body: dict[str, Any]) -> dict[str, Any]:
     for model in tags.get("models", []):
         model["expires_at"] = "2099-12-31T23:59:59Z"
         model["size_vram"] = 0
+    logger.debug(
+        "translate models_list_to_ps — %d model(s)", len(tags.get("models", []))
+    )
     return tags
 
 

@@ -42,6 +42,13 @@ async def sse_to_ollama_stream(
     done_received = False
     content_emitted = False
 
+    logger.info(
+        "Stream start — model=%s is_chat=%s",
+        model,
+        is_chat,
+    )
+    line_count = 0
+
     try:
         async for line in _read_sse_lines(upstream_response):
             if not line.startswith("data: "):
@@ -50,6 +57,7 @@ async def sse_to_ollama_stream(
             data = line[6:].strip()
             if data == "[DONE]":
                 done_received = True
+                logger.debug("Stream — [DONE] received after %d line(s)", line_count)
                 yield (
                     json.dumps(adapter.build_chunk(done=True), separators=(",", ":"))
                     + "\n"
@@ -69,18 +77,15 @@ async def sse_to_ollama_stream(
             try:
                 parsed = json.loads(data)
             except json.JSONDecodeError:
-                logger.warning("Skipping malformed SSE line: %s", line[:100])
+                logger.warning("Stream — skipping malformed SSE line: %s", line[:100])
                 continue
 
             if isinstance(parsed, dict) and "error" in parsed:
                 done_received = True
+                logger.warning("Stream — upstream error in chunk: %s", parsed["error"])
                 yield (
                     json.dumps(
-                        {
-                            "model": model,
-                            "error": parsed["error"],
-                            "done": True,
-                        },
+                        {"error": parsed["error"]},
                         separators=(",", ":"),
                     )
                     + "\n"
@@ -88,21 +93,22 @@ async def sse_to_ollama_stream(
                 break
 
             content_emitted = True
+            line_count += 1
             adapter._accumulate(parsed)
 
             chunk = adapter.build_chunk(done=False)
+            logger.debug(
+                "Stream — line %d: chunk=%s", line_count, _truncate_json(chunk)
+            )
             yield json.dumps(chunk, separators=(",", ":")) + "\n"
 
     except httpx.ReadTimeout:
         done_received = True
+        logger.error("Stream — upstream read timeout after %d line(s)", line_count)
         yield json.dumps(adapter.build_chunk(done=True), separators=(",", ":")) + "\n"
         yield (
             json.dumps(
-                {
-                    "model": model,
-                    "error": "upstream request timed out",
-                    "done": True,
-                },
+                {"error": "request to AI server timed out"},
                 separators=(",", ":"),
             )
             + "\n"
@@ -110,6 +116,7 @@ async def sse_to_ollama_stream(
 
     except httpx.StreamError:
         done_received = True
+        logger.error("Stream — upstream connection lost after %d line(s)", line_count)
         if not content_emitted and (adapter.content or adapter.tool_calls):
             yield (
                 json.dumps(adapter.build_chunk(done=False), separators=(",", ":"))
@@ -117,11 +124,7 @@ async def sse_to_ollama_stream(
             )
         yield (
             json.dumps(
-                {
-                    "model": model,
-                    "error": "upstream connection lost mid-response",
-                    "done": True,
-                },
+                {"error": "connection to AI server lost during response"},
                 separators=(",", ":"),
             )
             + "\n"
@@ -129,26 +132,28 @@ async def sse_to_ollama_stream(
 
     finally:
         if not done_received:
+            logger.warning("Stream — connection closed without [DONE]")
             yield (
                 json.dumps(
-                    {
-                        "model": model,
-                        "error": "upstream connection lost mid-response",
-                        "done": True,
-                    },
+                    {"error": "connection to AI server lost during response"},
                     separators=(",", ":"),
                 )
                 + "\n"
             )
+        else:
+            logger.info("Stream — completed after %d line(s)", line_count)
         await upstream_response.aclose()
 
 
 def _ts_to_iso8601(unix_ts: int | float | None) -> str:
-    """Convert a Unix timestamp to an ISO 8601 string."""
+    """Convert a Unix timestamp to an ISO 8601 string.
+
+    Uses second-precision with .000000Z to match Ollama's sub-second format.
+    """
     if unix_ts is None:
         return ""
     try:
-        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(unix_ts)))
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000000Z", time.gmtime(int(unix_ts)))
     except (OSError, ValueError, OverflowError):
         return ""
 
@@ -164,6 +169,14 @@ async def _read_sse_lines(response: httpx.Response) -> AsyncIterator[str]:
             yield line
     if buffer.strip():
         yield buffer.rstrip("\r")
+
+
+def _truncate_json(obj: dict[str, Any], max_len: int = 200) -> str:
+    """Truncate a dict to max_len characters for logging."""
+    text = json.dumps(obj, separators=(",", ":"))
+    if len(text) > max_len:
+        return text[:max_len] + "..."
+    return text
 
 
 # Backward-compatible re-exports for tests.

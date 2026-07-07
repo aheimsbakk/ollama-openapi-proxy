@@ -27,28 +27,28 @@ def parse_args(argv: list[str] | None = None) -> Config:
         "-H",
         type=str,
         default=None,
-        help="Network interface to bind (default: 0.0.0.0, env: LISTEN_HOST)",
+        help="Network address to listen on (default: 0.0.0.0, env: LISTEN_HOST)",
     )
     parser.add_argument(
         "--port",
         "-p",
         type=int,
         default=None,
-        help="TCP port to bind (default: 11434, env: LISTEN_PORT)",
+        help="TCP port to listen on (default: 11434, env: LISTEN_PORT)",
     )
     parser.add_argument(
         "--upstream-url",
         "-u",
         type=str,
         default=None,
-        help="Base URL of the OpenAI-compatible upstream server (default: http://localhost:8080/v1, env: UPSTREAM_URL)",
+        help="Base URL of the OpenAI-compatible AI server (default: http://localhost:8080/v1, env: UPSTREAM_URL)",
     )
     parser.add_argument(
         "--timeout",
         "-t",
         type=int,
         default=None,
-        help="Maximum time in seconds to wait for an upstream response (default: 300, env: REQUEST_TIMEOUT)",
+        help="Maximum time in seconds to wait for the AI server to respond (default: 300, env: REQUEST_TIMEOUT)",
     )
     parser.add_argument(
         "--verbosity",

@@ -32,26 +32,43 @@ async def handle_generate(
     client: UpstreamClient = Depends(get_upstream_client),
 ) -> JSONResponse | StreamingResponse:
     """Handle POST /api/generate requests."""
+    logger.info("POST /api/generate — handling request")
+
     # Parse the Ollama request body
     try:
         ollama_body = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="invalid request body: could not parse JSON")
+        logger.warning("POST /api/generate — invalid JSON body")
+        raise HTTPException(
+            status_code=400, detail="Invalid request body. Could not parse JSON."
+        )
 
     # Validate required fields
     if "model" not in ollama_body:
+        logger.warning("POST /api/generate — missing required field: model")
         raise HTTPException(status_code=400, detail="missing required field: model")
+
+    # prompt is optional — Ollama allows model load/unload without it
     if "prompt" not in ollama_body:
-        raise HTTPException(status_code=400, detail="missing required field: prompt")
+        ollama_body["prompt"] = ""
+        logger.debug("POST /api/generate — no prompt (model load/unload)")
+
+    model = ollama_body.get("model", "")
+    logger.debug(
+        "POST /api/generate — model=%s stream=%s",
+        model,
+        ollama_body.get("stream", False),
+    )
 
     # Translate to OpenAI request
     openai_body = req_trans.generate_to_completion(ollama_body)
     is_streaming = openai_body.get("stream", False)
-    model = ollama_body.get("model", "")
 
     if is_streaming:
+        logger.info("POST /api/generate — streaming response for model=%s", model)
         return await _handle_generate_stream(ollama_body, openai_body, model, client)
     else:
+        logger.info("POST /api/generate — non-streaming response for model=%s", model)
         return await _handle_generate_non_stream(openai_body, model, client)
 
 
@@ -62,8 +79,10 @@ async def _handle_generate_non_stream(
 ) -> JSONResponse:
     """Handle non-streaming /api/generate requests."""
     upstream_url = f"{client.base_url}/completions"
+    logger.debug("POST /api/generate — forwarding to upstream: %s", upstream_url)
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.completion_to_generate(openai_response)
+    logger.info("POST /api/generate — response ready for model=%s", model)
     return JSONResponse(content=ollama_response)
 
 
@@ -75,8 +94,10 @@ async def _handle_generate_stream(
 ) -> StreamingResponse:
     """Handle streaming /api/generate requests."""
     upstream_url = f"{client.base_url}/completions"
+    logger.debug("POST /api/generate — opening upstream stream: %s", upstream_url)
     upstream_response = await client.stream_post(upstream_url, json=openai_body)
 
+    logger.info("POST /api/generate — streaming started for model=%s", model)
     return StreamingResponse(
         streaming.sse_to_ollama_stream(
             upstream_response=upstream_response,

@@ -25,9 +25,19 @@ def build_error_response(exc: Exception) -> JSONResponse:
     if isinstance(exc, AppError):
         status_code = exc.status_code
         message = exc.message
+        logger.warning(
+            "AppError — status=%s message=%s",
+            status_code,
+            message,
+        )
     elif isinstance(exc, HTTPException):
         status_code = exc.status_code
         message = exc.detail
+        logger.warning(
+            "HTTPException — status=%s message=%s",
+            status_code,
+            message,
+        )
     else:
         logger.exception("Unhandled exception during request processing")
         status_code = 500
@@ -40,9 +50,9 @@ def build_error_response(exc: Exception) -> JSONResponse:
 
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Top-level exception handler installed on the FastAPI app.
+    """Handle any exception that escapes a request handler.
 
-    Catches every error that escapes a handler and returns an Ollama-compatible
-    error response. The server never crashes on a single request failure.
+    Returns an Ollama-compatible error response so a single failing request
+    does not crash the server.
     """
     return build_error_response(exc)

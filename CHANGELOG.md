@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.1] - 2026-07-07
+
+- **why:** Rewrite user-facing error messages and CLI help text in plain language for clarity
+- **model:** deepseek-v4-flash-free
+- **tags:** refactor, clear-language, error-messages, docs
+
+### Changed
+
+- `src/ollama_openai_proxy/client.py` — replaced "upstream" with "AI server" in 7 user-facing error messages (unreachable, timeout, non-200).
+- `src/ollama_openai_proxy/translators/streaming.py` — replaced "upstream" with "AI server" in 4 NDJSON streaming error payloads.
+- `src/ollama_openai_proxy/handlers/generate.py`, `chat.py`, `embed.py`, `models.py` — rewritten HTTP 400 error details as full sentences with capital letters and periods.
+- `src/ollama_openai_proxy/handlers/models.py` — changed "model not found on upstream" to "Model '...' not found on the AI server." (HTTP 404).
+- `src/ollama_openai_proxy/router.py` — shortened unsupported-endpoint message from "endpoint not supported by this proxy" to "Endpoint not supported".
+- `src/ollama_openai_proxy/cli.py` — replaced "upstream server", "bind", and passive voice in 4 CLI help texts with plain alternatives.
+- `src/ollama_openai_proxy/server.py` — replaced "upstream server" with "AI server" in the FastAPI auto-generated API description.
+- `src/ollama_openai_proxy/dependencies.py` — rewritten RuntimeError message to say "HTTP client not initialized" instead of "UpstreamClient not initialized".
+- `src/ollama_openai_proxy/errors.py` — trimmed bragging sentence from `global_exception_handler` docstring.
+- `src/ollama_openai_proxy/client.py`, `translators/streaming.py` — changed `_truncate_body` and `_truncate_json` docstrings from passive to active voice.
+- `tests/test_dependencies.py` — updated assertion to match new RuntimeError message.
+
 ## [0.2.0] - 2026-07-07
 
 - **why:** Expose model capabilities, context length, and metadata so clients detect tool/vision support

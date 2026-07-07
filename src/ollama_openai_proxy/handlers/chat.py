@@ -32,26 +32,42 @@ async def handle_chat(
     client: UpstreamClient = Depends(get_upstream_client),
 ) -> JSONResponse | StreamingResponse:
     """Handle POST /api/chat requests."""
+    logger.info("POST /api/chat — handling request")
+
     # Parse the Ollama request body
     try:
         ollama_body = await request.json()
     except Exception:
-        raise HTTPException(status_code=400, detail="invalid request body: could not parse JSON")
+        logger.warning("POST /api/chat — invalid JSON body")
+        raise HTTPException(
+            status_code=400, detail="Invalid request body. Could not parse JSON."
+        )
 
     # Validate required fields
     if "model" not in ollama_body:
+        logger.warning("POST /api/chat — missing required field: model")
         raise HTTPException(status_code=400, detail="missing required field: model")
     if "messages" not in ollama_body:
+        logger.warning("POST /api/chat — missing required field: messages")
         raise HTTPException(status_code=400, detail="missing required field: messages")
+
+    model = ollama_body.get("model", "")
+    logger.debug(
+        "POST /api/chat — model=%s messages=%d stream=%s",
+        model,
+        len(ollama_body.get("messages", [])),
+        ollama_body.get("stream", False),
+    )
 
     # Translate to OpenAI request
     openai_body = req_trans.chat_to_chat_completions(ollama_body)
     is_streaming = openai_body.get("stream", False)
-    model = ollama_body.get("model", "")
 
     if is_streaming:
+        logger.info("POST /api/chat — streaming response for model=%s", model)
         return await _handle_chat_stream(ollama_body, openai_body, model, client)
     else:
+        logger.info("POST /api/chat — non-streaming response for model=%s", model)
         return await _handle_chat_non_stream(openai_body, model, client)
 
 
@@ -62,8 +78,10 @@ async def _handle_chat_non_stream(
 ) -> JSONResponse:
     """Handle non-streaming /api/chat requests."""
     upstream_url = f"{client.base_url}/chat/completions"
+    logger.debug("POST /api/chat — forwarding to upstream: %s", upstream_url)
     openai_response = await client.post(upstream_url, json=openai_body)
     ollama_response = resp_trans.chat_completion_to_chat(openai_response)
+    logger.info("POST /api/chat — response ready for model=%s", model)
     return JSONResponse(content=ollama_response)
 
 
@@ -75,8 +93,10 @@ async def _handle_chat_stream(
 ) -> StreamingResponse:
     """Handle streaming /api/chat requests."""
     upstream_url = f"{client.base_url}/chat/completions"
+    logger.debug("POST /api/chat — opening upstream stream: %s", upstream_url)
     upstream_response = await client.stream_post(upstream_url, json=openai_body)
 
+    logger.info("POST /api/chat — streaming started for model=%s", model)
     return StreamingResponse(
         streaming.sse_to_ollama_stream(
             upstream_response=upstream_response,

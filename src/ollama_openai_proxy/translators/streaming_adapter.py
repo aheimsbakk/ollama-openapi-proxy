@@ -13,11 +13,14 @@ from typing import Any
 
 
 def _ts_to_iso8601(unix_ts: int | float | None) -> str:
-    """Convert a Unix timestamp to an ISO 8601 string."""
+    """Convert a Unix timestamp to an ISO 8601 string.
+
+    Uses second-precision with .000000Z to match Ollama's sub-second format.
+    """
     if unix_ts is None:
         return ""
     try:
-        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(unix_ts)))
+        return time.strftime("%Y-%m-%dT%H:%M:%S.000000Z", time.gmtime(int(unix_ts)))
     except (OSError, ValueError, OverflowError):
         return ""
 

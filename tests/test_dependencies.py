@@ -24,7 +24,7 @@ class TestGetUpstreamClient:
             deps._upstream_client = None
             with pytest.raises(RuntimeError) as exc_info:
                 get_upstream_client()
-            assert "UpstreamClient not initialized" in str(exc_info.value)
+            assert "HTTP client not initialized" in str(exc_info.value)
         finally:
             deps._upstream_client = original
 

@@ -12,7 +12,7 @@ def get_upstream_client() -> UpstreamClient:
     """Return the singleton upstream client, or raise if not initialized."""
     if _upstream_client is None:
         raise RuntimeError(
-            "UpstreamClient not initialized. Did you call server.create_app()?"
+            "HTTP client not initialized. Call server.create_app() before handling requests."
         )
     return _upstream_client
 

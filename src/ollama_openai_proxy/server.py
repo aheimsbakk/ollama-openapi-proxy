@@ -21,9 +21,15 @@ def create_app(config: Config) -> FastAPI:
 
     Registers all routes, middleware, and lifecycle hooks.
     """
+    logger.info(
+        "Creating application — upstream: %s, timeout: %ds",
+        config.upstream_url,
+        config.request_timeout,
+    )
+
     app = FastAPI(
         title="Ollama-to-OpenAI Proxy",
-        description="Drop-in Ollama API proxy that translates to/from an OpenAI-compatible upstream server.",
+        description="Drop-in proxy that translates Ollama API calls to an OpenAI-compatible AI server and back.",
         version="0.0.0-proxy",
     )
 
@@ -35,22 +41,27 @@ def create_app(config: Config) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    logger.debug("CORS middleware configured: allow all origins")
 
     # Global exception handler — catches everything and returns Ollama error format.
     app.add_exception_handler(Exception, global_exception_handler)
+    logger.debug("Global exception handler installed")
 
     # Create the upstream HTTP client and register it as a dependency.
     upstream = UpstreamClient(
         base_url=config.upstream_url, timeout_seconds=config.request_timeout
     )
     set_upstream_client(upstream)
+    logger.debug("Upstream HTTP client created")
 
     # Register all Ollama API routes.
     register_routes(app, upstream)
+    logger.info("All API routes registered")
 
     @app.on_event("shutdown")
     async def _shutdown() -> None:
         """Close the upstream client on shutdown."""
+        logger.info("Shutting down — closing upstream client connection")
         if upstream:
             await upstream.close()
 

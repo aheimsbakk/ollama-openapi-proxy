@@ -374,8 +374,8 @@ class TestModelsShowToShow:
         result = resp_trans.models_show_to_show(body)
         assert result["model"] == "gemma-4"
         assert result["modelfile"] == "[gemma-4]\ntemperature = 1.0\n"
-        assert "tools" in result["details"]["capabilities"]
-        assert "vision" in result["details"]["capabilities"]
+        assert "tools" in result["capabilities"]
+        assert "vision" in result["capabilities"]
         assert result["model_info"]["general.parameter_count"] == 25_233_142_046
         assert result["model_info"]["general.file_type"] == "Q4_K - Medium"
         assert result["model_info"]["llm.context_length"] == 256_000
@@ -390,7 +390,7 @@ class TestModelsShowToShow:
         assert result["model"] == "test-model"
         assert result["model_info"] == {}
         assert result["modelfile"] == ""
-        assert "capabilities" not in result.get("details", {})
+        assert "capabilities" not in result
 
     def test_context_length_from_args_fallback(self) -> None:
         """Unloaded model gets context_length from status.args --ctx-size."""

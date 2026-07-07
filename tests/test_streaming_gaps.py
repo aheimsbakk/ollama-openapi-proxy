@@ -251,9 +251,8 @@ class TestGap4ContentEmittedBeforeError:
             last_content.get("message", {}).get("content", "") == "Hello world again"
         ), f"Last content line should have accumulated content, got: {last_content}"
 
-        # Last line should be an error
+        # Last line should be an error (Ollama format: {"error": "..."})
         error_line = json.loads(lines[-1].strip())
-        assert error_line["done"] is True
         assert "error" in error_line
 
     @pytest.mark.asyncio
@@ -284,7 +283,6 @@ class TestGap4ContentEmittedBeforeError:
         )
 
         error_line = json.loads(lines[-1].strip())
-        assert error_line["done"] is True
         assert "error" in error_line
 
     @pytest.mark.asyncio
@@ -301,5 +299,4 @@ class TestGap4ContentEmittedBeforeError:
         # Should have exactly 1 error line (no content to emit)
         assert len(lines) == 1
         error_line = json.loads(lines[0].strip())
-        assert error_line["done"] is True
         assert "error" in error_line

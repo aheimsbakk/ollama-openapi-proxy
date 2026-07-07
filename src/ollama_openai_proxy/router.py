@@ -6,6 +6,7 @@ return HTTP 501. Unknown paths return HTTP 404.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -14,6 +15,8 @@ from fastapi.responses import JSONResponse
 from ollama_openai_proxy.client import UpstreamClient
 from ollama_openai_proxy.errors import AppError
 from ollama_openai_proxy.handlers import chat, embed, generate, models
+
+logger = logging.getLogger("ollama_openai_proxy")
 
 
 def register_routes(app: FastAPI, client: UpstreamClient) -> None:
@@ -30,6 +33,8 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
         tags=["inference"],
         response_model=None,
     )
+    logger.debug("Route registered: POST /api/generate")
+
     app.add_api_route(
         "/api/chat",
         chat.handle_chat,
@@ -37,6 +42,7 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
         tags=["inference"],
         response_model=None,
     )
+    logger.debug("Route registered: POST /api/chat")
 
     # --- Embedding endpoints ---
     app.add_api_route(
@@ -46,6 +52,8 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
         tags=["embedding"],
         response_model=None,
     )
+    logger.debug("Route registered: POST /api/embed")
+
     app.add_api_route(
         "/api/embeddings",
         embed.handle_embeddings_legacy,
@@ -53,20 +61,25 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
         tags=["embedding"],
         response_model=None,
     )
+    logger.debug("Route registered: POST /api/embeddings (legacy)")
 
     # --- Informational endpoints ---
     app.add_api_route(
         "/api/tags", models.handle_tags, methods=["GET"], tags=["informational"]
     )
+    logger.debug("Route registered: GET /api/tags")
     app.add_api_route(
         "/api/show", models.handle_show, methods=["POST"], tags=["informational"]
     )
+    logger.debug("Route registered: POST /api/show")
     app.add_api_route(
         "/api/ps", models.handle_ps, methods=["GET"], tags=["informational"]
     )
+    logger.debug("Route registered: GET /api/ps")
     app.add_api_route(
         "/api/version", models.handle_version, methods=["GET"], tags=["informational"]
     )
+    logger.debug("Route registered: GET /api/version")
 
     # --- Unsupported endpoints (return 501) ---
     unsupported = [
@@ -85,6 +98,7 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
             methods=[method],
             tags=["unsupported"],
         )
+        logger.debug("Route registered (unsupported): %s %s", method, path)
 
     # --- Catch-all for unknown paths ---
     # FastAPI doesn't have a native catch-all, so we use a fallback route.
@@ -95,6 +109,7 @@ def register_routes(app: FastAPI, client: UpstreamClient) -> None:
     async def _catch_all(request: Request, path: str) -> JSONResponse:
         """Return 404 for any path not matched by the routes above."""
         full_path = f"/{path}"
+        logger.warning("Unknown path requested: %s %s", request.method, full_path)
         return JSONResponse(
             status_code=404,
             content={"error": "not found"},
@@ -109,7 +124,8 @@ async def _unsupported_handler(
     Returns HTTP 501 with a descriptive error message.
     """
     path = request.url.path
+    logger.warning("Unsupported endpoint called: %s %s", request.method, path)
     return JSONResponse(
         status_code=501,
-        content={"error": f"endpoint not supported by this proxy: {path}"},
+        content={"error": f"Endpoint not supported: {path}"},
     )

@@ -152,14 +152,17 @@ class TestSSEAdapter:
         assert chunk["eval_count"] == 4
 
     def test_build_chunk_non_streaming_completions(self) -> None:
-        """Building a done chunk for completions includes response field."""
+        """Building a done chunk for completions has empty response (Ollama convention)."""
         adapter = streaming._SSEAdapter("test-model", 1720000000, is_chat=False)
         adapter.content = "The sky is blue"
         adapter.finish_reason = "stop"
         adapter.usage = {"prompt_tokens": 5, "completion_tokens": 4}
         chunk = adapter.build_chunk(done=True)
         assert chunk["done"] is True
-        assert chunk["response"] == "The sky is blue"
+        assert chunk["response"] == ""
+        assert chunk["done_reason"] == "stop"
+        assert chunk["prompt_eval_count"] == 5
+        assert chunk["eval_count"] == 4
         assert "message" not in chunk
 
 

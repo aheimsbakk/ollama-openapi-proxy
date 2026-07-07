@@ -311,7 +311,6 @@ wheels = [
 
 [[package]]
 name = "ollama-openai-proxy"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

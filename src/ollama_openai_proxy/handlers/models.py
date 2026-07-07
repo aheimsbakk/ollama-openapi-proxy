@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from ollama_openai_proxy import __version__
 from ollama_openai_proxy.client import UpstreamClient
 from ollama_openai_proxy.dependencies import get_upstream_client
 from ollama_openai_proxy.translators import response as resp_trans
@@ -91,6 +92,6 @@ def handle_version(
     request: Request,
     client: UpstreamClient = Depends(get_upstream_client),
 ) -> JSONResponse:
-    """Handle GET /api/version — return static version info."""
-    logger.info("GET /api/version — returning version")
-    return JSONResponse(content={"version": "0.0.0-proxy"})
+    """Handle GET /api/version — return program version."""
+    logger.info("GET /api/version — returning version %s", __version__)
+    return JSONResponse(content={"version": __version__})

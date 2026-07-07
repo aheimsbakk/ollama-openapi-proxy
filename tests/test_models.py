@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi.testclient import TestClient
 
+from ollama_openai_proxy import __version__
 from tests.conftest import (
     SAMPLE_MODELS_RESPONSE,
     _MockUpstreamClient,
@@ -120,4 +121,4 @@ class TestVersion:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["version"] == "0.0.0-proxy"
+        assert body["version"] == __version__

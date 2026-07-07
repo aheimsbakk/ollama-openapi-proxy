@@ -7,6 +7,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ollama_openai_proxy import __version__
 from ollama_openai_proxy.client import UpstreamClient
 from ollama_openai_proxy.config import Config
 from ollama_openai_proxy.dependencies import get_upstream_client, set_upstream_client
@@ -30,7 +31,7 @@ def create_app(config: Config) -> FastAPI:
     app = FastAPI(
         title="Ollama-to-OpenAI Proxy",
         description="Drop-in proxy that translates Ollama API calls to an OpenAI-compatible AI server and back.",
-        version="0.0.0-proxy",
+        version=__version__,
     )
 
     # CORS: allow all origins for drop-in compatibility with Ollama clients.

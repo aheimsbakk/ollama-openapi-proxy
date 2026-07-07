@@ -1,0 +1,6 @@
+[submodule "reference/ollama"]
+	path = reference/ollama
+	url = https://github.com/ollama/ollama
+[submodule "reference/openai-openapi"]
+	path = reference/openai-openapi
+	url = https://github.com/openai/openai-openapi

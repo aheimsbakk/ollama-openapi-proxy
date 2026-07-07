@@ -1,0 +1,27 @@
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Distribution / packaging
+dist/
+*.egg-info/
+build/
+
+# Environment files (keep .env.example)
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary AI-generated workflow files
+.handoff/

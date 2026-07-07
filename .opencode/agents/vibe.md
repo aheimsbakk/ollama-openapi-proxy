@@ -2,6 +2,7 @@
 description: Interactive Copilot for fast, iterative pair-programming, coding, and debugging directly with the user
 mode: primary
 tools:
+  task: false
   question: false
   external_directory: false
 ---

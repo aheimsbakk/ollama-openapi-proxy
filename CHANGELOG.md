@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.2] - 2026-07-07
+
+- **why:** Fix four streaming defects found during blueprint audit
+- **model:** llama-cpp/qwen-3.6-think-coding
+- **tags:** streaming, fix, blueprint-audit
+
+### Fixed
+
+- `src/ollama_openai_proxy/translators/streaming_adapter.py` — final `done:true` chunk for completions now yields empty `response` field per Ollama convention (client already has content from intermediate chunks).
+- `src/ollama_openai_proxy/translators/streaming.py` — extracts `created` timestamp from the first SSE data line when not provided, so `created_at` is populated in every streaming line.
+- `src/ollama_openai_proxy/translators/streaming_adapter.py` — tool call `arguments` are now parsed from JSON strings to dicts in streaming mode, matching non-streaming behavior.
+- `src/ollama_openai_proxy/translators/streaming.py` — on stream interruption, accumulated content is emitted before the error line so no generated text is lost.
+
+### Added
+
+- `src/ollama_openai_proxy/translators/streaming_adapter.py` — extracted SSE state machine and chunk builder into a separate module (194 lines) to keep `streaming.py` under 200 lines.
+- `tests/test_streaming_gaps.py` — 13 regression tests covering the four streaming gaps identified in the blueprint audit.
+
+### Changed
+
+- `CODEBASE.md` — added `streaming_adapter.py` and `test_streaming_gaps.py` to directory tree and tracing table.
+
 ## [0.1.1] - 2026-07-07
 
 - **why:** Add tests to reach 80%+ coverage threshold and create ADR for coverage policy

@@ -192,7 +192,8 @@ src/ollama_openai_proxy/
 └── translators/    # Request/response translation logic
     ├── request.py  # Ollama → OpenAI
     ├── response.py # OpenAI → Ollama
-    └── streaming.py # SSE-to-NDJSON stream adapter
+    ├── streaming.py # SSE-to-NDJSON stream adapter
+    └── streaming_adapter.py # SSE state machine and chunk builder
 ```
 
 See `BLUEPRINT.md` for the architecture specification and `CODEBASE.md` for

@@ -162,13 +162,21 @@ work/                                   # Repository root
 │           │     model_show_to_show(openai_body) → ollama_body
 │           │   Handles: timestamp conversion, field renaming, structure reshaping.
 │           │
-│           └── streaming.py           # SSE-to-NDJSON stream adapter
-│               Maps to: Stream Adapter (Blueprint §2, §9)
-│               Async generator: sse_to_ollama_stream(httpx_response, translator_fn)
-│               Reads SSE lines from the upstream response.
-│               Parses `data:` lines, passes JSON chunks through translator_fn,
-│               yields serialized Ollama NDJSON lines.
-│               Accumulates usage stats for the final done:true object.
+│           ├── streaming.py           # SSE-to-NDJSON stream adapter
+│           │   Maps to: Stream Adapter (Blueprint §2, §9)
+│           │   Async generator: sse_to_ollama_stream(httpx_response, translator_fn)
+│           │   Reads SSE lines from the upstream response.
+│           │   Parses `data:` lines, passes JSON chunks through translator_fn,
+│           │   yields serialized Ollama NDJSON lines.
+│           │   Extracts created timestamp from first chunk if not provided.
+│           │
+│           ├── streaming_adapter.py   # SSE state machine and chunk builder
+│           │   Maps to: Stream Adapter (Blueprint §2, §9)
+│           │   SSEAdapter class: processes SSE lines, accumulates state,
+│           │   builds Ollama-format response objects. Handles tool call
+│           │   argument parsing (string → dict) and final-chunk empty
+│           │   response per Ollama convention.
+│           │
 │
 ├── tests/
 │   ├── __init__.py
@@ -184,7 +192,8 @@ work/                                   # Repository root
 │   ├── test_translators.py           # Pure-function tests for translators
 │   ├── test_request_translator_edge_cases.py  # Request translation edge cases
 │   ├── test_streaming.py             # Streaming adapter unit tests
-│   └── test_streaming_edge_cases.py  # Streaming adapter integration & edge cases
+│   ├── test_streaming_edge_cases.py  # Streaming adapter integration & edge cases
+│   └── test_streaming_gaps.py        # Regression tests for blueprint streaming gaps
 │
 └── scripts/
     └── verify_codebase_sync.sh        # Validates CODEBASE.md paths exist
@@ -212,7 +221,7 @@ work/                                   # Repository root
 | Request Translators (§3) | `src/ollama_openai_proxy/translators/request.py` |
 | Response Translators (§3) | `src/ollama_openai_proxy/translators/response.py` |
 | HTTP Client (§2) | `src/ollama_openai_proxy/client.py` |
-| Stream Adapter (§2, §9) | `src/ollama_openai_proxy/translators/streaming.py` |
+| Stream Adapter (§2, §9) | `src/ollama_openai_proxy/translators/streaming.py` + `translators/streaming_adapter.py` |
 | Error Boundaries (§7) | `src/ollama_openai_proxy/errors.py` |
 | External Configuration (§6) | `src/ollama_openai_proxy/config.py` + `cli.py` |
 | Unsupported Endpoints (§3.3) | `src/ollama_openai_proxy/router.py` (501 return in route registration) |
